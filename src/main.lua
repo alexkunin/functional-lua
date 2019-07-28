@@ -1,0 +1,588 @@
+--require "luarocks.loader"
+--local inspect = require 'inspect'
+--
+--local function dd(...)
+--    for i = 1, select('#', ...) do
+--        local v = select(i, ...)
+--        print(inspect(v))
+--    end
+--end
+--
+--local function mkType(name, methodsFactory)
+--    local typeMt     = { __index = {} }
+--    local type       = setmetatable({ name = name }, typeMt)
+--    local methods    = methodsFactory(type)
+--    local instanceMt = { __index = methods }
+--
+--    function typeMt.__index.of(value)
+--        local instance = setmetatable({}, instanceMt)
+--        instance:init(value)
+--        return instance
+--    end
+--
+--    return type
+--end
+--
+--local Maybe    = mkType('Maybe', function(Maybe)
+--    return {
+--        init = function(self, value)
+--            self.value = value
+--        end,
+--
+--        map  = function(self, fn)
+--            if self.value ~= nil then
+--                return Maybe.of(fn(self.value))
+--            else
+--                return self
+--            end
+--        end
+--    }
+--end)
+--
+--local instance = Maybe.of(123)
+--
+--dd(instance:map(function(value) return value + 1 end))
+--
+--if true then
+--    return
+--end
+--
+--local function stringify(v)
+--    if v == nil then
+--        return 'nil'
+--    elseif type(v) == 'number' then
+--        return tostring(v)
+--    elseif type(v) == 'string' then
+--        return '"' .. v .. '"'
+--    else
+--        return tostring(v)
+--    end
+--end
+--
+--local function id(v)
+--    return v
+--end
+--
+--local function curry_n(n, f, ...)
+--    if select('#', ...) >= n then
+--        return f(...)
+--    else
+--        local args = { ... }
+--        return function(...)
+--            local mergedArgs = { unpack(args) }
+--            local v
+--            for i = 1, select('#', ...) do
+--                v = select(i, ...)
+--                table.insert(mergedArgs, v)
+--            end
+--            return curry_n(n, f, unpack(mergedArgs))
+--        end
+--    end
+--end
+--
+--local function compose(...)
+--    local fs = { ... }
+--    return function(v)
+--        for i = table.maxn(fs), 1, -1 do
+--            v = fs[i](v)
+--        end
+--        return v
+--    end
+--end
+--
+--local types      = {}
+--
+--local instanceMt = {
+--    __index = {}
+--}
+--
+--function instanceMt:__tostring()
+--    return stringify(self.type) .. '(' .. stringify(self.value) .. ')'
+--end
+--
+--function instanceMt.__index:map(fn)
+--    return types[self.type.name].map(self, fn)
+--end
+--
+--local def     = (function()
+--    local instanceMt = { }
+--
+--    function instanceMt:new(...)
+--        return setmetatable(..., self)
+--    end
+--
+--    function instanceMt:__call(...)
+--        return self.code(...)
+--    end
+--
+--    function instanceMt:__tostring(...)
+--        return self.signature
+--    end
+--
+--    local builderMt = {
+--        __index = { }
+--    }
+--
+--    return function(signature, f)
+--        local name, argTypeSignatures, returnType
+--        local argTypes                      = {}
+--        name, argTypeSignatures, returnType = signature:match('^(.-) :: (.* -> )(.-)$')
+--        if name then
+--            for match in argTypeSignatures:gmatch('(.-)%s*->%s*') do
+--                table.insert(argTypes, match)
+--            end
+--        else
+--            name, returnType = signature:match('^(.-) :: (.-)$')
+--            if not name then
+--                error('Cannot parse signature: "' .. signature .. '"');
+--            end
+--        end
+--
+--        local arity = table.maxn(argTypes)
+--
+--        local code
+--        if arity > 1 then
+--            code = curry_n(arity, f)
+--        else
+--            code = f
+--        end
+--
+--        return instanceMt:new {
+--            signature  = signature,
+--            name       = name,
+--            argTypes   = argTypes,
+--            returnType = returnType,
+--            arity      = arity,
+--            code       = code
+--        }
+--    end
+--end)()
+--
+--local add     = def(
+--    'add :: Number -> Number -> Number',
+--    function(a, b) return a + b end
+--)
+--
+--local mul     = def(
+--    'mul :: Number -> Number -> Number',
+--    function(a, b) return a * b end
+--)
+--
+--local prepend = def(
+--    'prepend :: String -> String -> String',
+--    function(a, b) return a .. b end
+--)
+--
+--local append  = def(
+--    'prepend :: String -> String -> String',
+--    function(a, b) return b .. a end
+--)
+--
+--assert(compose(add(1))(1) == 2)
+--assert(compose(add(1), mul(2))(3) == 7)
+--
+--assert(map(add(1), 2) == 3)
+--
+--local Maybe = (function()
+--    local mt = {
+--        __index = {}
+--    }
+--
+--    function mt.of(v)
+--        return setmetatable({ v = v }, mt)
+--    end
+--
+--    function mt:__tostring()
+--        if self:isNothing() then
+--            return 'Nothing'
+--        else
+--            return 'Just(' .. stringify(self.v) .. ')'
+--        end
+--    end
+--
+--    function mt.__index:isNothing()
+--        return self.v == nil
+--    end
+--
+--    function mt.__index:isJust()
+--        return self.v ~= nil
+--    end
+--
+--    function mt.__index:map(fn)
+--        if self:isNothing() then
+--            return self
+--        else
+--            return mt.of(fn(self.v))
+--        end
+--    end
+--
+--    return mt
+--end)()
+--
+--local maybe = curry_n(3, function(v, f, m)
+--    if m:isNothing() then
+--        return v
+--    else
+--        return f(m.v)
+--    end
+--end)
+--
+--assert(tostring(Maybe.of(nil)) == 'Nothing')
+--assert(tostring(Maybe.of(1)) == 'Just(1)')
+--assert(tostring(Maybe.of(1):map(id)) == 'Just(1)')
+--assert(tostring(Maybe.of('abc')) == 'Just("abc")')
+--assert(tostring(Maybe.of(Maybe.of(1))) == 'Just(Just(1))')
+--assert(maybe(1, tostring, Maybe.of(nil)) == 1)
+--
+--local Left, Right, Either
+--
+--Left         = (function()
+--    local mt = {
+--        __index = {}
+--    }
+--
+--    function mt.__index:map(_)
+--        return self
+--    end
+--
+--    function mt:__tostring()
+--        return 'Left(' .. stringify(self.v) .. ')'
+--    end
+--
+--    return mt;
+--end)()
+--
+--Right        = (function()
+--    local mt = {
+--        __index = {}
+--    }
+--
+--    function mt.__index:map(f)
+--        return Either.of(f(self.v))
+--    end
+--
+--    function mt:__tostring()
+--        return 'Right(' .. stringify(self.v) .. ')'
+--    end
+--
+--    return mt;
+--end)()
+--
+--Either       = (function()
+--    local mt = {}
+--
+--    function mt.of(v)
+--        return setmetatable({ v = v }, Right)
+--    end
+--
+--    return mt;
+--end)()
+--
+--local left   = function(x)
+--    return setmetatable({ v = x }, Left)
+--end
+--
+--local either = curry_n(3, function(f, g, e)
+--    local mt = getmetatable(e)
+--    if mt == Left then
+--        return f(e.v)
+--    elseif mt == Right then
+--        return g(e.v)
+--    else
+--        error('Either expects Left or Right as 3rd argument')
+--    end
+--end)
+--
+--assert(tostring(left(1)) == 'Left(1)')
+--assert(tostring(Either.of(1)) == 'Right(1)')
+--assert(either(id, add(1))(Either.of(3)) == 4)
+--assert(either(id, add(1))(left('Error')) == 'Error')
+--
+--local IO = (function()
+--    local mt = {
+--        __index = {}
+--    }
+--
+--    function mt.new(fn)
+--        return setmetatable({ unsafePerformIO = fn }, mt)
+--    end
+--
+--    function mt.of(x)
+--        return mt.new(function()
+--            return x
+--        end)
+--    end
+--
+--    function mt.__index:map(fn)
+--        return mt.new(compose(fn, self.unsafePerformIO))
+--    end
+--
+--    function mt.__index:ap(f)
+--        return self:chain(function(fn)
+--            return f:map(fn)
+--        end)
+--    end
+--
+--    function mt.__index:chain(fn)
+--        return self:map(fn):join()
+--    end
+--
+--    function mt.__index:join()
+--        local this = self
+--        return mt.new(function()
+--            return this.unsafePerformIO().unsafePerformIO()
+--        end)
+--    end
+--
+--    function mt:__tostring()
+--        return 'IO(' .. stringify(self.unsafePerformIO) .. ')'
+--    end
+--
+--    return mt
+--end)()
+--
+--assert(IO.of(1).unsafePerformIO() == 1)
+--assert(IO.of(1):map(add(1)).unsafePerformIO() == 2)
+--
+--local Task              = (function()
+--    local mt = {
+--        __index = {}
+--    }
+--
+--    function mt.new(fork)
+--        return setmetatable({ fork = fork }, mt)
+--    end
+--
+--    function mt:__tostring()
+--        return 'Task(' .. stringify(self.fork) .. ')'
+--    end
+--
+--    function mt.rejected(x)
+--        return mt.new(function(reject, _)
+--            return reject(x)
+--        end)
+--    end
+--
+--    function mt.of(x)
+--        return mt.new(function(_, resolve)
+--            return resolve(x)
+--        end)
+--    end
+--
+--    function mt.__index:map(fn)
+--        local this = self
+--        return mt.new(function(reject, resolve)
+--            return this.fork(reject, compose(resolve, fn))
+--        end)
+--    end
+--
+--    function mt.__index:ap(f)
+--        return self:chain(function(fn)
+--            return f:map(fn)
+--        end)
+--    end
+--
+--    function mt.__index:chain(fn)
+--        local this = self
+--        return mt.new(function(reject, resolve)
+--            return this.fork(reject, function(x)
+--                return fn(x).fork(reject, resolve)
+--            end)
+--        end)
+--    end
+--
+--    function mt.__index:join(f)
+--        return self:chain(id)
+--    end
+--
+--    return mt
+--end)()
+--
+--local output            = function(v)
+--    return IO.new(function()
+--        print(v)
+--    end)
+--end
+--
+--local getGlobalValue    = function(name)
+--    return IO.new(function()
+--        return _G[name]
+--    end)
+--end
+--
+--x                       = 'this is x'
+--
+--local decorate          = compose(
+--    prepend('for sure, '),
+--    append('!')
+--)
+--
+--local join              = function(f)
+--    return f:join()
+--end
+--
+--local chain             = curry_n(2, function(f, fn)
+--    return f:chain(fn)
+--end)
+--
+--local log               = curry_n(2, function(m, v)
+--    print('[LOG][' .. m .. ']', stringify(v))
+--    return v
+--end)
+--
+--local outputGlobalValue = compose(
+--    join,
+--    map(output),
+--    getGlobalValue
+--)
+--
+----print(getGlobalValue('x'):map(decorate).unsafePerformIO())
+--
+--local outputX           = outputGlobalValue('x')
+--outputX.unsafePerformIO()
+----outputGlobalValue('x').unsafePerformIO()
+--
+--local asyncOutput           = function(x)
+--    return Task.new(function(reject, resolve)
+--        print(x)
+--        resolve()
+--    end)
+--end
+--
+--local iteratorToTable       = function(it)
+--    local v = {}
+--    for line in it do
+--        table.insert(v, line)
+--    end
+--    return v
+--end
+--
+--local safeCall2             = curry_n(2, function(f, a)
+--    return Task.new(function(reject, resolve)
+--        local success, res = pcall(f, a)
+--        if success then resolve(res) else reject(res) end
+--    end)
+--end)
+--
+--local prop                  = curry_n(2, function(name, v)
+--    return v[name]
+--end)
+--
+--local idOf                  = function(x)
+--    return function()
+--        return x
+--    end
+--end
+--
+--local ioLines               = compose(
+--    map(prop('lines')),
+--    getGlobalValue,
+--    idOf('io')
+--)
+--
+--local getLinesFromFile      = def(
+--    'getLinesFromFile :: Filename -> Task Error [String]',
+--    compose(
+--        map(iteratorToTable),
+--        safeCall2(io.lines)
+--    )
+--)
+--
+----print(t.fork(
+----    function(error)
+----        print('Error:', error)
+----    end,
+----    function(result)
+----        print('Success:', result)
+----    end
+----))
+--
+--local head                  = def(
+--    'head :: [a] -> a',
+--    function(xs) return xs[1] end
+--)
+--
+--local B1                    = curry_n(4, function(f, g, h, x)
+--    return f(g(x), h(x))
+--end)
+--
+--local quote                 = B1(compose, prepend, append)
+--
+--local unsafePerformIO       = function(io)
+--    return io.unsafePerformIO()
+--end
+--
+--local outputFirstLineOfFile = compose(
+--    map(unsafePerformIO),
+--    map(output),
+--    map(quote('"')),
+--    map(head),
+--    getLinesFromFile
+--)
+--
+--outputFirstLineOfFile('test.txt').fork(
+--    function(error)
+--        print('Error:', error)
+--    end,
+--    function(result)
+--        print('Success:', result)
+--    end
+--)
+--
+--local String                 = defType('String')
+--local Filename               = defType('String')
+--local _Task                  = defType('String')
+--local Error                  = defType('String')
+--local Empty                  = defType('()')
+--
+--local outputFirstLineOfFile2 = def(
+--    'outputFirstLineOfFile2 :: Filename -> Task Error Void',
+--    compose(
+--        map(unsafePerformIO),
+--        map(output),
+--        map(quote('"')),
+--        map(head),
+--        getLinesFromFile
+--    )
+--)
+--
+--local reportError            = def(
+--    'reportError :: Error -> ()',
+--    compose(
+--        unsafePerformIO,
+--        output,
+--        prepend('[ERROR] ')
+--    )
+--)
+--
+--local reportSuccess          = def(
+--    'reportSuccess :: Result -> ()',
+--    compose(
+--        unsafePerformIO,
+--        output,
+--        prepend('[SUCCESS] '),
+--        stringify
+--    )
+--)
+--
+--outputFirstLineOfFile2('test.txt1').fork(
+--    reportError,
+--    reportSuccess
+--)
+--
+--local NewMaybe = defType('NewMaybe', {
+--    map = function(self, fn)
+--        if self.value ~= nil then
+--            return self.type.of(fn(self.value))
+--        else
+--            return self
+--        end
+--    end
+--})
+--
+--dd(NewMaybe)
+--
+--local m = NewMaybe.of(1)
+--dd(m)
+--dd(map(add(1), m))
+--dd(map(add(1), NewMaybe.of(nil)))

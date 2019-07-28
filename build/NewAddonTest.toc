@@ -1,0 +1,9 @@
+## Interface: 70300
+## Title: NewAddonTest
+## Version: 0.0.0
+## DefaultState: enabled
+## LoadOnDemand: 0
+## SavedVariables: NewAddonTest
+## X-SavedVariable: NewAddonTest
+
+bundle.lua
